@@ -169,9 +169,10 @@ absAngle2 <- function(x){
 #' @param start Hour at which the resampled tracks should start
 #' @param individual Column that contains individual names
 #' @return \code{data.frame}
+# Function to resample fixes to a coarser resolution
 resFix <- function(data, hours, start, individual){
 
-  # Make sure data is a data.frame
+  # Make sure data is not in data.table format
   data <- as.data.frame(data)
 
   # Split the dataframe by individual
