@@ -171,8 +171,11 @@ absAngle2 <- function(x){
 #' @return \code{data.frame}
 resFix <- function(data, hours, start, individual){
 
+  # Make sure data is a data.frame
+  data <- as.data.frame(data)
+
   # Split the dataframe by individual
-  data <- split(data, as.factor(data[, individual]))
+  data <- base::split(data, as.factor(data[, individual]))
 
   # Loop over each list entry
   data <- lapply(data, function(x){
