@@ -31,6 +31,31 @@ degreesToMeters <- function(x){
 }
 
 ################################################################################
+#### Function to Reproject Coordinates
+################################################################################
+#' Reproject coordinates to another projection
+#'
+#' Function to transform coordinates into coordinates of another projection
+#' @export
+#' @param xy \code{data.frame} or matrix of coordinates that need to be
+#' transformed.
+#' @param from CRS of the coordinates
+#' @param to CRS to which the coordinates should be reprojected
+#' @return numeric value or vector
+#' @examples
+#' degreesToMeters(0.01)
+reprojCoords <- function(xy, from, to){
+  xy <- as.data.frame(xy)
+  coordinates(xy) <- as.matrix(xy)
+  crs(xy) <- from
+  reproj <- spTransform(xy, to)
+  reproj <- coordinates(reproj)
+  reproj <- as.matrix(reproj)
+  reproj <- unname(reproj)
+  return(reproj)
+}
+
+################################################################################
 #### Function to darken a color
 ################################################################################
 #' Darken a color
@@ -47,6 +72,29 @@ darken <- function(color, factor = 1.4){
     col <- col2rgb(color)
     col <- col / factor
     col <- rgb(t(col), maxColorValue = 255)
+    col
+}
+
+################################################################################
+#### Function to darken a color
+################################################################################
+#' Lighten a color
+#'
+#' Function to lighten a color
+#' @param color A character string naming a color
+#' @param factor Factor by which the color should be lightened. 1.4 by default
+#' @return Hexadecimal code of the lightened color
+#' @examples
+#' lighten("blue")
+#' plot(1:2, 1:2, cex = 70, pch = 20, col = c("blue", lighten("blue", 3)))
+#' @export
+lighten <- function(color, factor = 1.4){
+    col <- col2rgb(color)
+    col <- col * factor
+    col <- rgb(
+        t(as.matrix(apply(col, 1, function(x) if (x > 255) 255 else x)))
+      , maxColorValue = 255
+    )
     col
 }
 
@@ -581,9 +629,11 @@ writeForm <- function(x, slope = TRUE){
   # Prepare basic iSSF model formula
   form <- (case_ ~
     + cos_ta_
+    + sl_
     + log_sl_
     + (1|step_id_)
     + (0 + cos_ta_|id)
+    + (0 + sl_|id)
     + (0 + log_sl_|id)
   )
 
@@ -2122,7 +2172,7 @@ prepareCovars <- function(layers){
 #' to a range between 0 and 1
 #' @return \code{RasterLayer} or \code{RasterStack}
 normalizeMap <- function(x){
-  (x - minValue(x))/(maxValue(x) - minValue(x))
+  (x - min(x)) / (max(x) - min(x))
 }
 
 ################################################################################
