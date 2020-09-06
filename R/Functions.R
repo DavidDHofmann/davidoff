@@ -1231,6 +1231,7 @@ rasterizeTerra <- function(l, r){
     line <- l[i, ]
     rasterized <- terra::rasterize(line, r, field = 1, background = 0)
     summed <- sum(c(summed, rasterized))
+    gc()
     cat(i, "out of", length(l), "done...\n")
   }
   return(summed)
@@ -1827,7 +1828,7 @@ prepareModel <- function(model = NULL){
   # Return the coefficients and the formula
   return(list(
       coefficients  = coeffs
-    , formula     = newform
+    , formula       = newform
   ))
 }
 
@@ -2172,7 +2173,7 @@ prepareCovars <- function(layers){
 #' to a range between 0 and 1
 #' @return \code{RasterLayer} or \code{RasterStack}
 normalizeMap <- function(x){
-  (x - min(x)) / (max(x) - min(x))
+  (x - minValue(x)) / (maxValue(x) - minValue(x))
 }
 
 ################################################################################
