@@ -30,10 +30,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// interpolatePointsC
+NumericMatrix interpolatePointsC(const double x1, const double x2, const double y1, const double y2, const double by);
+RcppExport SEXP _davidoff_interpolatePointsC(SEXP x1SEXP, SEXP x2SEXP, SEXP y1SEXP, SEXP y2SEXP, SEXP bySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const double >::type x1(x1SEXP);
+    Rcpp::traits::input_parameter< const double >::type x2(x2SEXP);
+    Rcpp::traits::input_parameter< const double >::type y1(y1SEXP);
+    Rcpp::traits::input_parameter< const double >::type y2(y2SEXP);
+    Rcpp::traits::input_parameter< const double >::type by(bySEXP);
+    rcpp_result_gen = Rcpp::wrap(interpolatePointsC(x1, x2, y1, y2, by));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_davidoff_getAbsNewC", (DL_FUNC) &_davidoff_getAbsNewC, 2},
     {"_davidoff_calcEndpointsC", (DL_FUNC) &_davidoff_calcEndpointsC, 3},
+    {"_davidoff_interpolatePointsC", (DL_FUNC) &_davidoff_interpolatePointsC, 5},
     {NULL, NULL, 0}
 };
 

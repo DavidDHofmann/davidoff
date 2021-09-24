@@ -4,7 +4,7 @@
 \alias{resFix}
 \title{Resample GPS fixes}
 \usage{
-resFix(data, hours, start, individual)
+resFix(data, hours, start, tol = 0.5)
 }
 \arguments{
 \item{data}{Data that contains a column entitled "Timestamps"}
@@ -13,7 +13,7 @@ resFix(data, hours, start, individual)
 
 \item{start}{Hour at which the resampled tracks should start}
 
-\item{individual}{Column that contains individual names}
+\item{tol}{tolerance (in hours)}
 }
 \value{
 \code{data.frame}

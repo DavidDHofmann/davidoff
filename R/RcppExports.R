@@ -9,7 +9,7 @@
 #' @param ta Relative turning angle
 #' @return numeric value
 getAbsNewC <- function(absta, ta) {
-    .Call('_davidoff_getAbsNewC', PACKAGE = 'davidoff', absta, ta)
+    .Call(`_davidoff_getAbsNewC`, absta, ta)
 }
 
 #' Calculate New Endpoints
@@ -21,6 +21,20 @@ getAbsNewC <- function(absta, ta) {
 #' @param sl step lengths
 #' @return numeric value
 calcEndpointsC <- function(xy, absta, sl) {
-    .Call('_davidoff_calcEndpointsC', PACKAGE = 'davidoff', xy, absta, sl)
+    .Call(`_davidoff_calcEndpointsC`, xy, absta, sl)
+}
+
+#' Interpolate Between two Points
+#'
+#' Function to interpolate coordinates between two points
+#' @export
+#' @param x1 numeric containing x coordiante of first point
+#' @param x2 numeric containing x coordiante of second point
+#' @param y1 numeric containing y coordiante of first point
+#' @param y2 numeric containing y coordiante of second point
+#' @param by numeric Approximate distance at which points should be interpolated
+#' @return matrix
+interpolatePointsC <- function(x1, x2, y1, y2, by) {
+    .Call(`_davidoff_interpolatePointsC`, x1, x2, y1, y2, by)
 }
 

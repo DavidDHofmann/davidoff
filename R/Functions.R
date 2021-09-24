@@ -15,7 +15,7 @@ metersToDegrees <- function(x){
 }
 
 ################################################################################
-#### Function to Degrees into Meters
+#### Function to Convert Degrees into Meters
 ################################################################################
 #' Convert degrees to meters
 #'
@@ -76,7 +76,7 @@ darken <- function(color, factor = 1.4){
 }
 
 ################################################################################
-#### Function to darken a color
+#### Function to lighten a color
 ################################################################################
 #' Lighten a color
 #'
@@ -99,7 +99,7 @@ lighten <- function(color, factor = 1.4){
 }
 
 ################################################################################
-#### Function to Turn Steps to Spaital Lines
+#### Function to Turn Steps to Spatial Lines
 ################################################################################
 #' Turn steps to Spatial Lines
 #'
@@ -117,10 +117,10 @@ lineTrack <- function(track, crs){
   # Create lines from the coordinates
   l <- vector("list", nrow(begincoords))
   for (i in seq_along(l)){
-      l[[i]] <- Lines(list(Line(rbind(
-          begincoords[i, ]
-        , endcoords[i,]
-      ))), as.character(i))
+    l[[i]] <- Lines(list(Line(rbind(
+        begincoords[i, ]
+      , endcoords[i,]
+    ))), as.character(i))
   }
 
   # Make the lines spatial
@@ -215,91 +215,9 @@ absAngle2 <- function(x){
 #' @param data Data that contains a column entitled "Timestamps"
 #' @param hours Aspired time between fixes in hours
 #' @param start Hour at which the resampled tracks should start
-#' @param individual Column that contains individual names
+#' @param tol tolerance (in hours)
 #' @return \code{data.frame}
-# Function to resample fixes to a coarser resolution
-resFix <- function(data, hours, start, individual){
-
-  # Make sure data is not in data.table format
-  data <- as.data.frame(data)
-
-  # Split the dataframe by individual
-  data <- base::split(data, as.factor(data[, individual]))
-
-  # Loop over each list entry
-  data <- lapply(data, function(x){
-
-    # Identify the first date at which a fix was taken
-    first <- range(x$Timestamp)[1] %>%
-
-      # Update the time to the start time specified in the function
-      update(., hour = start, min = 0, sec = 0)
-
-    # Identify the last date at which a fix was taken
-    last <- range(x$Timestamp)[2] %>%
-
-      # Update the time to the end time specified in the function
-      update(., hour = 24, min = 0, sec = 0)
-
-    # Prepare a range of dates for which we would expect to find data according
-    # to the specified sampling scheme
-    dates <- seq(first, last, by = paste0(hours, " hours")) %>%
-
-      # Coerce the data to a dataframe
-      as.data.frame() %>%
-
-      # Give the column a nicer name
-      set_names("Timestamp")
-
-    # Coerce the dataframes to data.tables
-    setDT(dates)
-    setDT(x)
-
-    # Define the keys by which we will join
-    setkey(dates, Timestamp)
-    setkey(x, Timestamp)
-
-    # Duplicate the Timestamps in the data table
-    x[, Timestamp2 := Timestamp]
-
-    # Run the join
-    x <- x[dates, roll = "nearest"]
-
-    # Remove the Timestamps that we created to resample
-    x$Timestamp <- NULL
-
-    # Coerce the data.table to a dataframe
-    x <- as.data.frame(x) %>%
-
-      # Rename the remaining timestmap column
-      rename(Timestamp = Timestamp2) %>%
-
-      # Remove any duplicates
-      distinct()
-
-    # Return the resulting dataframe
-    return(x)
-  })
-
-  # Collapse the list
-  data <- do.call(rbind, data)
-
-  # Remove the rownames
-  rownames(data) <- NULL
-
-  # Return the final dataframe
-  return(data)
-}
-
-#' Resample GPS fixes
-#'
-#' Function to resample fixes to a coarser resolution
-#' @export
-#' @param data Data that contains a column entitled "Timestamps"
-#' @param hours Aspired time between fixes in hours
-#' @param start Hour at which the resampled tracks should start
-#' @return \code{data.frame}
-resFix2 <- function(data, hours, start){
+resFix <- function(data, hours, start, tol = 0.5){
 
   # Identify the first date at which a fix was taken
   first <- range(data$Timestamp)[1] %>%
@@ -330,7 +248,7 @@ resFix2 <- function(data, hours, start){
     index <- which.min(abs(dates$Timestamp[x] - data$Timestamp))[1]
 
     # Check if the time difference is smaller than 30 mins
-    close <- as.numeric(abs(dates$Timestamp[x] - data$Timestamp[index]), units = "hours") < hours/2
+    close <- as.numeric(abs(dates$Timestamp[x] - data$Timestamp[index]), units = "hours") <= tol
 
     # In case the fix is close enough, return its index
     if (close){
@@ -345,6 +263,39 @@ resFix2 <- function(data, hours, start){
 
   # Return respective fixes
   return(data[closest, ])
+}
+
+################################################################################
+#### Function to Obtain Fixrate Scheme
+################################################################################
+#' Get Fixrate Scheme of Dog
+#'
+#' Function to obtain the approximate fixrate scheme for a desired dog
+#' @export
+#' @param data Data that contains a column entitled "Timestamps"
+#' @param dogs dogs for which you'd like the fixrate scheme
+#' @return \code{data.frame}
+getFixscheme <- function(data = NULL, dogs = NULL){
+
+  # Prepare table to fill
+  fix <- expand_grid(
+      DogName = dogs
+    , Hour    = 0:24
+  )
+
+  # Subset to desired dogs and identify fix timing
+  sub <- subset(data, DogName %in% dogs)
+  sub$TimestampRounded <- round_date(sub$Timestamp, "1 hour")
+  sub$Date <- as.Date(sub$Timestamp)
+  hours <- as.data.frame(table(hour(sub$TimestampRounded), sub$DogName))
+  names(hours) <- c("Hour", "DogName", "Fixes")
+  hours$Hour <- as.numeric(as.character(hours$Hour))
+  fix <- left_join(fix, hours, by = c("DogName", "Hour"))
+  fix$Fixes[is.na(fix$Fixes)] <- 0
+
+  # Create wide table and return it
+  fix <- spread(fix, Hour, Fixes)
+  return(fix)
 }
 
 ################################################################################
@@ -416,6 +367,34 @@ extrCov2 <- function(raster = NULL, feature = NULL){
 
   # Coerce to dataframe
   extracted <- as.data.frame(t(extracted))
+
+  # Return the final dataframe
+  return(extracted)
+}
+
+################################################################################
+#### Function to Extract Covariates at Coordinates (Fast)
+################################################################################
+#' Extract covariates quickly
+#'
+#' Function to extract raster values and calculate their average coverage along
+#' a spatial feature. This function requires the velox package which allows a
+#' much quicker value extraction.
+#' @export
+#' @param raster \code{velox raster} containing covariates
+#' @param feature Spatial feature (\code{sp} package) below which covariates
+#' should be extracted
+#' @return \code{data.frame}
+extrCov3 <- function(raster = NULL, feature = NULL){
+
+  # Copy velox raster
+  raster_copy <- raster$copy()
+
+  # Calculate average values
+  extracted <- raster_copy$extract_points(feature)
+
+  # Calculate average
+  extracted <- colMeans(extracted)
 
   # Return the final dataframe
   return(extracted)
@@ -670,6 +649,11 @@ visInt <- function(model
   , colorPalette  = NULL
   ){
 
+  # If no color palette is provided, use custom one
+  if (is.null(colorPalette)){
+    colorPalette <- colorRampPalette(c("black", "white"))
+  }
+
   # Get the data used to train the model
   data <- model.frame(model)
 
@@ -692,11 +676,20 @@ visInt <- function(model
   # Get the beta estimates from the model
   coeffs <- getCoeffs(model)
 
+  # Check for correct order
+  if (paste0(xVar, ":", yVar) %in% coeffs$Covariate){
+    interaction <- paste0(xVar, ":", yVar)
+  } else if (paste0(yVar, ":", xVar) %in% coeffs$Covariate){
+    interaction <- paste0(yVar, ":", xVar)
+  } else {
+    stop("Interaction does not exist")
+  }
+
   # Write a function to predict values based on x and y
   predictVals <- function(x, y){
       x * coeffs$Coefficient[coeffs$Covariate == xVar] +
       y * coeffs$Coefficient[coeffs$Covariate == yVar] +
-      x * y * coeffs$Coefficient[coeffs$Covariate == paste0(xVar, ":", yVar)]
+      x * y * coeffs$Coefficient[coeffs$Covariate == interaction]
   }
 
   # Apply the function to the seqX and seqY vectors
@@ -786,11 +779,20 @@ visInt2 <- function(model
   # Get the beta estimates from the model
   coeffs <- getCoeffs(model)
 
+  # Check for correct order
+  if (paste0(xVar, ":", yVar) %in% coeffs$Covariate){
+    interaction <- paste0(xVar, ":", yVar)
+  } else if (paste0(yVar, ":", xVar) %in% coeffs$Covariate){
+    interaction <- paste0(yVar, ":", xVar)
+  } else {
+    stop("Interaction does not exist")
+  }
+
   # Write a function to predict values based on x and y
   predictVals <- function(x, y){
       x * coeffs$Coefficient[coeffs$Covariate == xVar] +
       y * coeffs$Coefficient[coeffs$Covariate == yVar] +
-      x * y * coeffs$Coefficient[coeffs$Covariate == paste0(xVar, ":", yVar)]
+      x * y * coeffs$Coefficient[coeffs$Covariate == interaction]
   }
 
   # Apply the function to the seqX and seqY vectors
@@ -1216,8 +1218,9 @@ rasterizeVelox <- function(l, r){
 #' @param l \code{SpatialPoints}, \code{SpatialLines}, or \code{SpatialPolygons}
 #' to be rasterized
 #' @param r \code{RasterLayer} onto which the objects should be rasterized
+#' @param messages logical should a progress bar and update messages be printed?
 #' @return \code{RasterLayer}
-rasterizeTerra <- function(l, r){
+rasterizeTerra <- function(l, r, messages = T){
 
   # Load required packages
   require(terra)
@@ -1226,16 +1229,106 @@ rasterizeTerra <- function(l, r){
   summed <- rast(r)
   values(summed) <- 0
 
+  # Prepare progress bar
+  if (messages){
+    pb <- txtProgressBar(min = 0, max = length(l), initial = 0, style = 3, width = 55)
+  }
+
   # Loop through each line and rasterize it
   for (i in 1:length(l)){
+
+    # Rasterize lines sparately
     line <- l[i, ]
-    rasterized <- terra::rasterize(line, r, field = 1, background = 0)
+    rasterized <- terra::rasterize(line, r, value = 1, background = 0)
     summed <- sum(c(summed, rasterized))
     gc()
-    cat(i, "out of", length(l), "done...\n")
+
+    # Print progress
+    if (messages){
+      setTxtProgressBar(pb, i)
+    }
   }
   return(summed)
 }
+
+################################################################################
+#### Function to Rasterize Using SpatStat
+################################################################################
+#' Rasterize Shapes Using spatstat
+#'
+#' Function to rasterize using spatstat
+#' @export
+#' @param l \code{SpatialPoints}, \code{SpatialLines}, or \code{SpatialPolygons}
+#' to be rasterized
+#' @param r \code{RasterLayer} onto which the objects should be rasterized
+#' @param mc.cores numeric How many cores should be used?
+#' @return \code{RasterLayer}
+rasterizeSpatstat <- function(l, r, mc.cores = 1){
+
+  # In case we run the rasterization on a single core, run a loop
+  if (mc.cores == 1){
+
+    # Create im layer
+    values(r) <- 0
+    im <- as.im.RasterLayer(r)
+    summed <- im
+
+    # Prepare progress bar
+    pb <- txtProgressBar(
+        min     = 0
+      , max     = length(l)
+      , initial = 0
+      , style   = 3
+      , width   = 55
+    )
+
+    # Go through all lines and rasterize them
+    for (y in 1:length(l)){
+      line    <- as.psp(l[y, ], window = im)
+      line    <- as.mask.psp(line)
+      line_r  <- as.im.owin(line, na.replace = 0)
+      summed  <- Reduce("+", list(summed, line_r))
+      setTxtProgressBar(pb, y)
+    }
+
+    # Return heatmap as a raster
+    return(raster(summed))
+
+  # If multicore is desired
+  } else {
+
+    # Split lines into a package for each core
+    lines <- splitShape(l, n = mc.cores)
+
+    # Run in parallel
+    heatmap <- mclapply(lines, mc.cores = mc.cores, function(x){
+
+      # Create im layer
+      im <- as.im.RasterLayer(r)
+      summed <- im
+
+      # Rasterize each line
+      for (y in 1:length(x)){
+        line    <- as.psp(x[y, ], window = im)
+        line    <- as.mask.psp(line)
+        line_r  <- as.im.owin(line, na.replace = 0)
+        summed  <- Reduce("+", list(summed, line_r))
+      }
+
+      # Return the sum
+      return(summed)
+
+    })
+
+    # Combine heatmaps
+    heatmap <- Reduce("+", heatmap)
+
+    # Return as raster
+    return(raster(heatmap))
+
+  }
+}
+
 
 ################################################################################
 #### Function to Extend Raster and Fill Observed Values
@@ -1292,37 +1385,37 @@ extendRaster <- function(x, y){
 #' @return \code{SpatialLinesDataFrame}
 createSegments <- function(x){
 
-  # Identify its coordinates
-  multil <- coordinates(x) %>%
+  # Store the crs
+  crs <- crs(x)
 
-  # Convert to data frame
-  as.data.frame() %>%
+  # Get coordinates along line. Pair each segment's coordinates
+  coords <- coordinates(x)
+  coords <- as.data.frame(coords)
+  names(coords) <- c("x", "y")
+  coords$x_to <- lead(coords$x)
+  coords$y_to <- lead(coords$y)
+  coords <- na.omit(coords)
 
-  # Rename columns
-  setNames(c("x", "y")) %>%
+  # Coerce coordinates to spatial lines
+  lines <- apply(coords, 1, function(z){
+    l <- spLines(
+      rbind(
+        SpatialPoints(cbind(z["x"], z["y"]))
+      , SpatialPoints(cbind(z["x_to"], z["y_to"]))
+      )
+    )
+    return(l)
+  })
+  lines <- do.call(rbind, lines)
 
-  # Make sure from-to coordinates are in one row
-  mutate(x_to = lead(x)) %>%
-  mutate(y_to = lead(y)) %>%
+  # Add coordinates as data to each line
+  lines <- SpatialLinesDataFrame(lines, data = coords, match.ID = F)
 
-  # Remove na rows
-  na.omit() %>%
+  # Add back crs
+  crs(lines) <- crs
 
-  # Split each row into a list entry
-  split(seq(nrow(.))) %>%
-
-  # Coerce each row to a separate line
-  lapply(function(z){
-    l <- spLines(rbind(
-        SpatialPoints(data.frame(x = z$x, y = z$y))
-      , SpatialPoints(data.frame(y = z$x_to, x = z$y_to))
-    ))
-    l <- SpatialLinesDataFrame(l, data = z, match.ID = F)
-  return(l)
-  }) %>% do.call(rbind, .)
-
-  # Return this new multiline object
-  return(multil)
+  # Return the final object
+  return(lines)
 }
 
 ################################################################################
@@ -1512,6 +1605,89 @@ cutLineClose <- function(line, point, polygon, precision = 1){
 
   # Return the new line
   return(line)
+}
+
+################################################################################
+#### Function to Cut Line to Start and Endpoints
+################################################################################
+#' Cut line to given start and endpoint
+#'
+#' Function to cut line to given start and endpoint (as measured in distance
+#' between 0 and 1)
+#' @export
+#' @param line \code{SpatialLines} or \code{SpatialLinesDataFrame} that needs to
+#' be cut
+#' @param start numeric between 0 and 1. Distance at which the line should start
+#' @param end numeric between 0 and 1. Distance at which the line should end
+#' @return \code{SpatialLines}
+lineSubstring <- function(
+      line  = NULL # Line to be cut
+    , start = 0    # Distance at which the line should start
+    , end   = 1    # Distance at which the line should end
+  ){
+
+  # Identify distances at which new lines begin
+  dists <- gProject(line, as(line, "SpatialPoints"), normalized = T)
+
+  # Identify lines that are within the desired distances
+  index <- (dists >= start) & (dists <= end)
+
+  # Retrieve coordinates of startpoint, midpoints, and endpoint
+  res <- list(
+      gInterpolate(line, start, normalized = T)
+    , as(line, "SpatialPoints")[index, ]
+    , gInterpolate(line, end, normalized = T)
+  )
+
+  # Bind them together and coerce them to "SpatialLines"
+  res <- as(do.call(rbind, res), "SpatialLines")
+
+  # Return the final line
+  return(res)
+}
+
+################################################################################
+#### Function to Segment Line at Each Intersection with Polygon
+################################################################################
+#' Segment Line into Pieces at Intersections with Polygons
+#'
+#' Function to segment Line into segments at intersections with polygons
+#' @export
+#' @param line \code{SpatialLines} or \code{SpatialLinesDataFrame} that needs to
+#' be cut
+#' @param poly \code{SpatialPolygons} or \code{SpatialPolygonsDataFrame} which
+#' is used to segment the line
+#' @return \code{SpatialLines}
+segmentLine <- function(
+      line = NULL # Line to segment
+    , poly = NULL # Polygon according to which the line is segmented
+  ){
+
+  # Identify intersection points
+  ints <- gIntersection(as(poly, "SpatialLines"), line)
+
+  # Can only segment if there is at least one intersection
+  if (!is.null(ints)){
+
+    # Calculate distance of intersections on line
+    dists <- sort(gProject(line, ints, normalized = TRUE))
+    dists <- c(0, dists, 1)
+
+    # Segmentize line at intersections
+    segments <- lapply(1:(length(dists) - 1), function(x){
+      lineSubstring(line, dists[x], dists[x + 1])
+    })
+    segments <- do.call(rbind, segments)
+
+    # Return the segments
+    return(segments)
+
+  # If there are no intersections...
+  } else {
+
+    # ... return the original line
+    return(line)
+  }
 }
 
 ################################################################################
@@ -1799,39 +1975,6 @@ createPoints <- function(points = NULL, areas = NULL, n = 1, randomize = F){
   return(points)
 }
 
-################################################################################
-#### Function to Prepare Movement Model for Dispersal Simulation
-################################################################################
-#' Prepare Movement Model for Dispersal Simulation
-#'
-#' Function to prepare movement model for dispersal simulation
-#' @export
-#' @param model Movement model
-#' @return \code{list}
-prepareModel <- function(model = NULL){
-
-  # Extract parameter estimates from model
-  coeffs <- fixef(model)$cond
-
-  # Obtain original model formula and coerce it to a terms object
-  form <- model
-  form <- formula(form)
-  form <- terms(form)
-
-  # Identify and remove unnecessary terms
-  newform <- c("Intercept", "step_id_", "0 +")
-  newform <- paste(newform, collapse = "|")
-  newform <- grep(newform, attr(form, "term.labels"))
-  newform <- drop.terms(form, newform, keep.response = F)
-  newform <- formula(newform)
-
-  # Return the coefficients and the formula
-  return(list(
-      coefficients  = coeffs
-    , formula       = newform
-  ))
-}
-
 ###############################################################################
 ### Function to Force Absolute Turning Angle Between 0 and 2 Pi
 ###############################################################################
@@ -1924,31 +2067,6 @@ pointsInside <- function(xy = NULL, extent = NULL){
 }
 
 ################################################################################
-#### Function to Predict Selection Score from a glmmTMB Model
-################################################################################
-#' Predict Step Selection Scores
-#'
-#' Function to predict the step selection scores using a glmmTMB model
-#' @export
-#' @param coefficients named \code{list} containing the coefficients for each
-#' covariate
-#' @param formula object of class \code{formula}. The same formula that was used
-#' to fit the glmmTMB model
-#' @return \code{numeric vector} or \code{numeric value}
-predictScore <- function(coefficients = NULL, formula = NULL, data = data){
-
-  # Prepare model matrix from data
-  modeldat <- model.matrix(formula, data = data)
-
-  # Multiply the matrix with estimated selection coefficients to calculate
-  # predicted selection scores
-  scores <- exp(modeldat %*% coefficients)
-
-  # Return the predicted scores
-  return(scores)
-}
-
-################################################################################
 #### Function to Simulate Dispersal
 ################################################################################
 #' Simulate Dispersal
@@ -1972,15 +2090,15 @@ predictScore <- function(coefficients = NULL, formula = NULL, data = data){
 #' random step leaving the study extent will be omitted
 #' @return
 disperse <- function(
-    source              = NULL    # Start Coordinates
-  , covars              = NULL    # Spatial Covariates, prepared with our funct.
-  , model               = NULL    # iSSF Model, prepared with our funct.
-  , sl_dist             = NULL    # Step Length Distribution
-  , sl_max              = Inf     # What is the largest possible step?
-  , date                = as.POSIXct("2015-06-15 03:00:00", tz = "UTC")
-  , n_steps             = 10      # Number of steps simulated
-  , n_rsteps            = 25      # Number of random steps proposed
-  , stop                = F){     # Should the simulation stop at a boundary?
+    source   = NULL    # Start Coordinates
+  , covars   = NULL    # Spatial Covariates
+  , model    = NULL    # iSSF Model
+  , sl_dist  = NULL    # Step Length Distribution
+  , sl_max   = Inf     # Largest possible step?
+  , date     = NULL    # Start Date
+  , n_steps  = 10      # Number simulated steps
+  , n_rsteps = 25      # Number of proposed steps
+  , stop     = F){     # Stop at a boundary?
 
   # Create a new dataframe indicating the first location. Note that we draw
   # random turning angles to start off
@@ -2117,7 +2235,7 @@ disperse <- function(
     Probs <- SelectionScore / sum(SelectionScore)
 
     # Sample a step according to the above predicted probabilities
-    rand <- rand[sample(1:nrow(rand), size = 1, prob = Probs), ]
+    rand <- rand[sample(1:n_rsteps, size = 1, prob = Probs), ]
 
     # Add the step to our track
     track <- rbind(
@@ -2126,6 +2244,70 @@ disperse <- function(
     )
   }
   return(track)
+}
+
+################################################################################
+#### Function to Predict Selection Score from a glmmTMB Model
+################################################################################
+#' Predict Step Selection Scores
+#'
+#' Function to predict the step selection scores using a glmmTMB model
+#' @export
+#' @param coefficients named \code{list} containing the coefficients for each
+#' covariate
+#' @param formula object of class \code{formula}. The same formula that was used
+#' to fit the glmmTMB model
+#' @return \code{numeric vector} or \code{numeric value}
+predictScore <- function(coefficients = NULL, formula = NULL, data = data){
+
+  # Prepare model matrix from data
+  modeldat <- model.matrix(formula, data = data)
+
+  # Remove intercept <- WORK ON THIS IN CONJUNCTION WITH prepareModel
+  modeldat <- modeldat[, colnames(modeldat) != "(Intercept)"]
+
+  # Multiply the matrix with estimated selection coefficients to calculate
+  # predicted selection scores (no intercept though)
+  scores <- as.vector(exp(modeldat %*% coefficients))
+
+  # Return the predicted scores
+  return(scores)
+}
+
+################################################################################
+#### Function to Prepare Movement Model for Dispersal Simulation
+################################################################################
+#' Prepare Movement Model for Dispersal Simulation
+#'
+#' Function to prepare movement model for dispersal simulation
+#' @export
+#' @param model Movement model
+#' @return \code{list}
+prepareModel <- function(model = NULL){
+
+  # Extract parameter estimates from model
+  coeffs <- fixef(model)$cond
+
+  # Remove intercept
+  coeffs <- coeffs[names(coeffs) != "(Intercept)"]
+
+  # Obtain original model formula and coerce it to a terms object
+  form <- model
+  form <- formula(form)
+  form <- terms(form)
+
+  # Identify and remove unnecessary terms
+  newform <- c("Intercept", "step_id_", "0 +")
+  newform <- paste(newform, collapse = "|")
+  newform <- grep(newform, attr(form, "term.labels"))
+  newform <- drop.terms(form, newform, keep.response = F)
+  newform <- formula(newform)
+
+  # Return the coefficients and the formula
+  return(list(
+      coefficients  = coeffs
+    , formula       = newform
+  ))
 }
 
 ################################################################################
@@ -2177,56 +2359,161 @@ normalizeMap <- function(x){
 }
 
 ################################################################################
-#### Function to Coerce Simulated Trajectories to Proper Lines
+#### Function to Subset Simulations
 ################################################################################
-#' Coerce Simulated Trajectories to SpatialLines
+#' Subset simulations randomly
 #'
-#' Function to coerce simulated coordinates to lines after a desired number of
-#' steps
+#' Function to randomly select some of the simulations
 #' @export
 #' @param simulations \code{data.frame} resulting from the function
 #' \code{disperse}
-#' @param steps Number of steps to be considered. Set to 68 by default meaning
-#' that the first 68 steps are considered only
-#' @param sampling Which tracks should be coerced? One of "Static" or "Random"
-#' @param mc.cores Number of cores used for the coercion. Set to
-#' \code{detectCores() - 1} by default.
+#' @param nid integer Number of randomly drawn trajectories that should be
+#' returned. By default, all trajectories will be returned.
+#' @param steps integer Number of steps to be considered. By default, all steps
+#' are considered.
+#' @return \code{data.frame}
+subsims <- function(simulations, nid = NULL, steps = NULL, replace = F){
+
+  # Copy data
+  sims <- simulations
+
+  # Subset to random id
+  if (!is.null(nid)){
+
+    # Sample ids
+    ids <- unique(sims$TrackID)
+    ids <- sample(ids, size = nid, replace = replace)
+
+    # Subset to respective simulations
+    sims <- sims[sims$TrackID %in% ids, ]
+  }
+
+  # Subset to step number
+  if (!is.null(steps)){
+
+    # Subset to desired data
+    sims <- sims[sims$StepNumber <= steps + 1, ]
+
+  }
+
+  # Return the subset
+  return(sims)
+}
+
+################################################################################
+#### Function to Coerce Single Simulated Trajectories to Proper Lines
+################################################################################
+#' Coerce multiple Simulated Trajectories to SpatialLines
+#'
+#' Function to coerce simulated coordinates to lines after a desired number of
+#' steps. Basically a wrapper around \code{sim2tracks()}
+#' @export
+#' @param simulation \code{data.frame} resulting from the function
+#' \code{disperse()}
+#' @param keep.data logical Should the input dataframe be conserved?
+#' @return \code{SpatialLinesDataFrame}
+sim2tracks <- function(simulation = NULL, crs = NULL, keep.data = F){
+
+  # Unless keep.data is desired, remove all unnecessary columns
+  if (!keep.data){
+    simulation <- simulation[, c("x", "y")]
+  }
+
+  # Calculate number of steps
+  steps <- nrow(simulation) - 1
+
+  # If data does not need to be kept
+  if (!keep.data){
+    coordinates(simulation) <- c("x", "y")
+    lines <- spLines(simulation)
+    if (!is.null(crs)){
+      crs(lines) <- crs
+    }
+    return(lines)
+
+  # If data needs to be kept
+  } else {
+    pts <- simulation
+    coordinates(pts) <- c("x", "y")
+    line <- spLines(pts)
+    lines <- createSegments(line)
+    lines <- as(lines, "SpatialLinesDataFrame")
+    lines@data <- simulation[1:steps, ]
+    if (!is.null(crs)){
+      crs(lines) <- crs
+    }
+    return(lines)
+  }
+}
+
+################################################################################
+#### Function to Coerce Multiple Simulated Trajectories to Proper Lines
+################################################################################
+#' Coerce multiple Simulated Trajectories to SpatialLines
+#'
+#' Function to coerce simulated coordinates to lines after a desired number of
+#' steps. Basically a wrapper around \code{sim2tracks()}
+#' @export
+#' @param simulations \code{data.frame} resulting from the function
+#' \code{disperse}
+#' @param id character column name of the column containing the track id
+#' @param keep.data logical Should the input dataframe be conserved?
+#' @param mc.cores integer Number of cores used for the coercion. Set to
+#' 1 by default.
+#' @param messages logical Should a progress bar and messages be printed?
 #' @return \code{SpatialLinesDataFrame}
 sims2tracks <- function(
     simulations = NULL
-  , steps       = 68
-  , sampling    = c("Static", "Random")
-  , mc.cores    = detectCores() - 1
+  , id          = "TrackID"
+  , crs         = NULL
+  , keep.data   = F
+  , mc.cores    = 1
+  , messages    = T
   ){
 
-    # Subset data as desired
-    sims <- subset(simulations
-      , StepNumber <= steps
-      & PointSampling %in% sampling
-    )
+  # Keep only relevant data
+  if (!keep.data){
+    simulations <- simulations[, c("x", "y", "TrackID")]
+  }
 
-    # Nest the data so that each trajectory (unique ID) receives its own row
-    sims <- sims %>% group_by(ID) %>% nest()
+  # Nest data by id
+  simulations <- nest(simulations, data = -all_of(id))
 
-    # Move from point to step representation (create lines from points)
-    sims_traj <- mclapply(1:nrow(sims)
-      , mc.cores = mc.cores
-      , function(x){
-        p <- SpatialPoints(sims$data[[x]][, c("x", "y")])
-        l <- spLines(p)
-        l$StartPoint <- sims$data[[x]]$StartPoint[1]
-        return(l)
-    }) %>% do.call(rbind, .)
+  # Coerce each trajectory to a spatial lines object
+  if (messages){
+    lines <- pbmclapply(1:nrow(simulations)
+    , mc.cores           = mc.cores
+    , ignore.interactive = T
+    , FUN                = function(x){
+      l <- sim2tracks(
+          simulation = simulations$data[[x]]
+        , crs        = crs
+        , keep.data  = keep.data
+      )
+      l$TrackID <- simulations$TrackID[x]
+      return(l)
+    })
+  } else {
+    lines <- mclapply(1:nrow(simulations)
+    , mc.cores           = mc.cores
+    , FUN                = function(x){
+      l <- sim2tracks(
+          simulation = simulations$data[[x]]
+        , keep.data  = keep.data
+      )
+      l$TrackID <- simulations$TrackID[x]
+      return(l)
+    })
+  }
 
-    # Assign original IDs back to lines
-    sims_traj$ID <- sims$ID
+  # Bind them
+  lines <- do.call(rbind, lines)
 
-    # Assign proper crs
-    crs(sims_traj) <- CRS("+init=epsg:4326")
+  # Return the lines
+  return(lines)
 
-    # Return the tracks
-    return(sims_traj)
 }
+
 
 ################################################################################
 #### Function to Scale a Covariate Using a Scaling Table
@@ -2241,23 +2528,15 @@ sims2tracks <- function(
 #' column. The \code{data.frame} must contain rownames to indicating the
 #' covariates to which the scaling parameters belong to.
 #' @return \code{data.frame} or \code{RasterStack}
-scaleCovars <- function(covars, scaling){
-
-  # Scale covariates with the parameters from the scaling table
-  scaled <- sapply(1:ncol(covars), function(x){
+scaleCovars <- function (covars, scaling) {
+  scaled <- sapply(1:ncol(covars), function(x) {
     scale(covars[, x]
-      , center  = scaling[names(covars)[x], ]$Center
-      , scale   = scaling[names(covars)[x], ]$Scale
+      , center  = scaling$center[names(covars)[x]]
+      , scale   = scaling$scale[names(covars)[x]]
     )
   })
-
-  # Coerce to dataframe
   scaled <- as.data.frame(scaled)
-
-  # Assign names back
   names(scaled) <- names(covars)
-
-  # Return scaled covars
   return(scaled)
 }
 

@@ -2,31 +2,34 @@
 % Please edit documentation in R/Functions.R
 \name{sims2tracks}
 \alias{sims2tracks}
-\title{Coerce Simulated Trajectories to SpatialLines}
+\title{Coerce multiple Simulated Trajectories to SpatialLines}
 \usage{
 sims2tracks(
   simulations = NULL,
-  steps = 68,
-  sampling = c("Static", "Random"),
-  mc.cores = detectCores() - 1
+  id = "TrackID",
+  crs = NULL,
+  keep.data = F,
+  mc.cores = 1,
+  messages = T
 )
 }
 \arguments{
 \item{simulations}{\code{data.frame} resulting from the function
 \code{disperse}}
 
-\item{steps}{Number of steps to be considered. Set to 68 by default meaning
-that the first 68 steps are considered only}
+\item{id}{character column name of the column containing the track id}
 
-\item{sampling}{Which tracks should be coerced? One of "Static" or "Random"}
+\item{keep.data}{logical Should the input dataframe be conserved?}
 
-\item{mc.cores}{Number of cores used for the coercion. Set to
-\code{detectCores() - 1} by default.}
+\item{mc.cores}{integer Number of cores used for the coercion. Set to
+1 by default.}
+
+\item{messages}{logical Should a progress bar and messages be printed?}
 }
 \value{
 \code{SpatialLinesDataFrame}
 }
 \description{
 Function to coerce simulated coordinates to lines after a desired number of
-steps
+steps. Basically a wrapper around \code{sim2tracks()}
 }

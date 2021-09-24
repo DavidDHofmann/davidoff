@@ -10,7 +10,7 @@ disperse(
   model = NULL,
   sl_dist = NULL,
   sl_max = Inf,
-  date = as.POSIXct("2015-06-15 03:00:00", tz = "UTC"),
+  date = NULL,
   n_steps = 10,
   n_rsteps = 25,
   stop = F
