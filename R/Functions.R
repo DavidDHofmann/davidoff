@@ -1,4 +1,61 @@
 ################################################################################
+#### Function to Calculate Step Metrics
+################################################################################
+#' Function to calculate step metrics
+#'
+#' Function to calculate step metrics (step length, absolute turning angle,
+#' relative turning angle, steptime)
+#' @export
+#' @param x x coordinate (should be utm)
+#' @param y y coordinate (should be utm)
+#' @param timestamps dates so that the step duration can be computed
+#' @param degree should angles be converted to degrees?
+#' @return dataframe with the step metrics
+step_met <- function(x, y, timestamps = NULL, degree = T) {
+
+    # Compute distances moved in x and y direction
+    dx <- c(x[-1], NA) - x
+    dy <- c(y[-1], NA) - y
+
+    # Calculate step length
+    sl <- sqrt(dx ** 2 + dy ** 2)
+
+    # Compute absolute turn angle
+    absta <- atan2(dy, dx)
+    absta <- (absta - pi / 2) * (-1)
+    absta <- ifelse(absta < 0, 2 * pi + absta, absta)
+
+    # Compute relative turn angle
+    relta <- absta[-1] - absta[-length(absta)]
+    relta <- c(NA, relta)
+    relta <- ifelse(relta > +pi, relta - pi, relta)
+    relta <- ifelse(relta < -pi, relta + pi, relta)
+
+    # If timestamps are provided, calculate step duration
+    if (!is.null(timestamps)) {
+      dt <- difftime(lead(timestamps), timestamps, units = "hours")
+    }
+
+    # Convert angles to degrees (if desired)
+    if (degree) {
+        absta <- absta * 180 / pi
+        relta <- relta * 180 / pi
+    }
+
+    # Show start and endpoints
+    x_to <- lead(x)
+    y_to <- lead(y)
+    t_to <- lead(timestamps)
+
+    # Put metrics into data.frame
+    metrics <- data.frame(x, x_to, y, y_to, timestamps, t_to, sl, absta, relta, dt)
+    names(metrics) <- c("x1_", "x2_", "y1_", "y2_", "t1_", "t2_", "sl_", "absta_", "relta_", "dt_")
+
+    # Return the metrics
+    return(metrics)
+}
+
+################################################################################
 #### Function to Convert Meters into Degrees
 ################################################################################
 #' Convert meters to degrees
