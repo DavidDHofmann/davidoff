@@ -4,7 +4,7 @@
 \alias{reprojCoords}
 \title{Reproject coordinates to another projection}
 \usage{
-reprojCoords(xy, from, to)
+reprojCoords(xy, from = NULL, to = NULL)
 }
 \arguments{
 \item{xy}{\code{data.frame} or matrix of coordinates that need to be

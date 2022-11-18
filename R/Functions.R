@@ -101,15 +101,11 @@ degreesToMeters <- function(x){
 #' @return numeric value or vector
 #' @examples
 #' degreesToMeters(0.01)
-reprojCoords <- function(xy, from, to){
-  xy <- as.data.frame(xy)
-  coordinates(xy) <- as.matrix(xy)
-  crs(xy) <- from
-  reproj <- spTransform(xy, to)
-  reproj <- coordinates(reproj)
-  reproj <- as.matrix(reproj)
-  reproj <- unname(reproj)
-  return(reproj)
+reprojCoords <- function(xy, from = NULL, to = NULL) {
+  xy <- as.matrix(xy)
+  xy <- vect(xy, crs = from)
+  xy <- terra::project(xy, to, threads = F)
+  return(crds(xy))
 }
 
 ################################################################################
@@ -165,7 +161,8 @@ lighten <- function(color, factor = 1.4){
 #' @param track Track created using the amt package
 #' @param crs Coordinate reference system of the track
 #' @return \code{SpatialLinesDataFrame}
-lineTrack <- function(track, crs){
+lineTrack <- function(track, crs, progress = F){
+
 
   # Define the start and end coordinates
   begincoords <- data.frame(x = track$x1_, y = track$y1_)
@@ -173,11 +170,14 @@ lineTrack <- function(track, crs){
 
   # Create lines from the coordinates
   l <- vector("list", nrow(begincoords))
+  n <- length(l)
+  pb <- txtProgressBar(min = 0, max = n, style = 3)
   for (i in seq_along(l)){
     l[[i]] <- Lines(list(Line(rbind(
         begincoords[i, ]
       , endcoords[i,]
     ))), as.character(i))
+    setTxtProgressBar(pb, i)
   }
 
   # Make the lines spatial
@@ -896,9 +896,15 @@ visInt2 <- function(model
 #' @param x \code{RasterLayer} on which distances should be calculated
 #' @param value value to which the distance should be calculated
 #' @return \code{RasterLayer}
-distanceTo <- function(x, value = 1){
+distanceTo <- function(x, value = 1) {
 
-  # This package requires some packages
+  # Convert to regular raster if terra raster is provided
+  if (inherits(x, "SpatRaster")) {
+    x <- raster(x)
+    returnterra <- T
+  }
+
+  # Function requires two packages
   require(spatstat)
   require(maptools)
 
@@ -1398,7 +1404,7 @@ rasterizeSpatstat <- function(l, r, mc.cores = 1){
 #' @param x \code{RasterLayer}
 #' @param y extent to which the raster should be extended
 #' @return \code{RasterLayer}
-extendRaster <- function(x, y){
+extendRaster <- function(x, y) {
 
   # Create mask of NA values
   na_mask <- is.na(x)

@@ -4,7 +4,7 @@
 \alias{lineTrack}
 \title{Turn steps to Spatial Lines}
 \usage{
-lineTrack(track, crs)
+lineTrack(track, crs, progress = F)
 }
 \arguments{
 \item{track}{Track created using the amt package}

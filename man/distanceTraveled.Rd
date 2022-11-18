@@ -13,9 +13,6 @@ package}
 \item{fixes}{Numeric value indicaing how many fixes should be considered to
 calculate the distance travelled}
 }
-\value{
-
-}
 \description{
 Function to identify distance traveled in previous fixes
 }

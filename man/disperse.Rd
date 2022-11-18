@@ -40,9 +40,6 @@ that is biologically sensible}
 step leaves the study extent. \code{FALSE} by default, indicating that any
 random step leaving the study extent will be omitted}
 }
-\value{
-
-}
 \description{
 Function to simulate dispersal based on a step selection model that was
 fitted in the glmmTMB framework

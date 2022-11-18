@@ -14,9 +14,6 @@ be cut}
 a regular interval. \code{T} by default. If this is set to \code{F}, the line
 is cut into lengths of equal lengths.}
 }
-\value{
-
-}
 \description{
 Function to segment a line into equal parts. There are two options. Either
 the line is split into equal segments of equal length or the line is split
